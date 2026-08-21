@@ -20,7 +20,7 @@ function SelectScreen() {
             MAYBEU SHOW
           </h1>
           <p className="font-mono opacity-60 text-xs sm:text-sm uppercase tracking-widest">
-            made by Persimon Production
+            made by LOFT
           </p>
         </div>
 

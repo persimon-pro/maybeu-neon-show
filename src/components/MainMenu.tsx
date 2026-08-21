@@ -21,7 +21,7 @@ export function MainMenu({ onSelectRound }: MainMenuProps) {
           ВЫБЕРИТЕ РАУНД
         </h1>
         <p className="text-[8px] sm:text-[10px] font-mono opacity-50 mt-2 sm:mt-4 uppercase tracking-[0.2em] sm:tracking-[0.3em]">
-          made by Persimon Production
+          made by LOFT
         </p>
       </div>
       
