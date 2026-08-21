@@ -17,7 +17,7 @@ function SelectScreen() {
       <div className="max-w-3xl w-full flex flex-col gap-6 sm:gap-12 relative z-10">
         <div className="text-center">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-cyan-400 uppercase tracking-[0.1em] sm:tracking-[0.2em] mb-2 sm:mb-4 glow-cyan drop-shadow-md">
-            MAYBEU SHOW
+            LOFT SHOW
           </h1>
           <p className="font-mono opacity-60 text-xs sm:text-sm uppercase tracking-widest">
             made by LOFT

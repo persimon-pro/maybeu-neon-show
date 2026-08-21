@@ -15,7 +15,7 @@ export function ScoreBoard({ onGoHome }: ScoreBoardProps) {
         className="group flex flex-col items-center justify-center cursor-pointer hover:scale-105 transition-all mx-2 shrink-0"
       >
         <span className="text-xs sm:text-lg md:text-2xl lg:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 drop-shadow-[0_0_15px_rgba(0,229,255,0.4)] uppercase tracking-[0.1em] sm:tracking-[0.2em] whitespace-nowrap">
-          MAYBEU SHOW
+          LOFT SHOW
         </span>
       </button>
 

@@ -47,8 +47,8 @@ export const initialGameState: ServerGameState = {
   }
 };
 
-const STORAGE_KEY = 'maybeu_neon_game_state_v1';
-const CHANNEL_NAME = 'maybeu_neon_channel';
+const STORAGE_KEY = 'loft_neon_game_state_v1';
+const CHANNEL_NAME = 'loft_neon_channel';
 
 function loadStoredState(): ServerGameState {
   try {

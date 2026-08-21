@@ -63,7 +63,7 @@ export function HostPanel() {
           <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 uppercase tracking-widest mb-1 drop-shadow-[0_0_15px_rgba(34,211,238,0.3)]">
             Настройка игры
           </h1>
-          <p className="text-xs font-mono opacity-55 uppercase tracking-widest">MAYBEU SHOW</p>
+          <p className="text-xs font-mono opacity-55 uppercase tracking-widest">LOFT SHOW</p>
         </div>
 
         {/* Game Mode */}
