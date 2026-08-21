@@ -1,0 +1,6 @@
+{
+  "name": "Неоновое Шоу",
+  "description": "Интерактивная игра-викторина (SPA) для мероприятий с 6 раундами.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
