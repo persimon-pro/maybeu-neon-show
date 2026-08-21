@@ -7,16 +7,35 @@ import { Round3 } from './components/Round3';
 import { Round4 } from './components/Round4';
 import { Round5 } from './components/Round5';
 import { Round6 } from './components/Round6';
+import { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { HostPanel } from './components/HostPanel';
 import { useGameState } from './useGameState';
 
 function SelectScreen() {
+  const [hostUrl, setHostUrl] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setHostUrl(`${window.location.origin}/host`);
+    }
+  }, []);
+
+  const handleCopy = () => {
+    if (hostUrl) {
+      navigator.clipboard.writeText(hostUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden">
       <div className="atmosphere" />
-      <div className="max-w-3xl w-full flex flex-col gap-6 sm:gap-12 relative z-10">
+      <div className="max-w-4xl w-full flex flex-col gap-6 sm:gap-8 relative z-10 py-6">
         <div className="text-center">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-cyan-400 uppercase tracking-[0.1em] sm:tracking-[0.2em] mb-2 sm:mb-4 glow-cyan drop-shadow-md">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-cyan-400 uppercase tracking-[0.1em] sm:tracking-[0.2em] mb-2 glow-cyan drop-shadow-md">
             LOFT SHOW
           </h1>
           <p className="font-mono opacity-60 text-xs sm:text-sm uppercase tracking-widest">
@@ -24,27 +43,63 @@ function SelectScreen() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
-          <Link to="/display" className="glass-panel p-6 sm:p-12 rounded-2xl sm:rounded-3xl flex flex-col items-center justify-center hover:scale-105 transition-all duration-300 group hover:glow-cyan">
-             <div className="text-5xl sm:text-8xl mb-4 sm:mb-8 opacity-50 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0">📺</div>
-             <h2 className="text-xl sm:text-3xl font-bold text-white uppercase tracking-widest mb-1 sm:mb-3">Главный Экран</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          <Link to="/display" className="glass-panel p-6 sm:p-10 rounded-2xl sm:rounded-3xl flex flex-col items-center justify-center hover:scale-[1.02] transition-all duration-300 group hover:glow-cyan">
+             <div className="text-5xl sm:text-7xl mb-4 opacity-70 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0">📺</div>
+             <h2 className="text-xl sm:text-3xl font-bold text-white uppercase tracking-widest mb-1 sm:mb-2">Главный Экран</h2>
              <p className="text-cyan-400/80 font-mono text-xs sm:text-sm text-center uppercase tracking-widest">Проектор / ТВ</p>
           </Link>
           
-          <Link to="/host" className="glass-panel p-6 sm:p-12 rounded-2xl sm:rounded-3xl flex flex-col items-center justify-center hover:scale-105 transition-all duration-300 group hover:shadow-[0_0_20px_rgba(16,185,129,0.3)]">
-             <div className="text-5xl sm:text-8xl mb-4 sm:mb-8 opacity-50 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0">📱</div>
-             <h2 className="text-xl sm:text-3xl font-bold text-white uppercase tracking-widest mb-1 sm:mb-3">Пульт Ведущего</h2>
-             <p className="text-emerald-400/80 font-mono text-xs sm:text-sm text-center uppercase tracking-widest">Мобильное Управление</p>
+          <Link to="/host" className="glass-panel p-6 sm:p-10 rounded-2xl sm:rounded-3xl flex flex-col items-center justify-center hover:scale-[1.02] transition-all duration-300 group hover:shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+             <div className="text-5xl sm:text-7xl mb-4 opacity-70 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0">📱</div>
+             <h2 className="text-xl sm:text-3xl font-bold text-white uppercase tracking-widest mb-1 sm:mb-2">Пульт Ведущего</h2>
+             <p className="text-emerald-400/80 font-mono text-xs sm:text-sm text-center uppercase tracking-widest">Открыть в этом браузере</p>
           </Link>
         </div>
 
-        <div className="mt-4 sm:mt-12 p-4 sm:p-6 glass-panel rounded-lg sm:rounded-xl text-center">
-          <p className="text-slate-400 font-mono text-[9px] sm:text-[11px] uppercase tracking-[0.15em] sm:tracking-[0.2em] leading-relaxed">
-            Для управления с другого устройства:<br/>
-            1. Убедитесь, что оба устройства в одной локальной сети.<br/>
-            2. Откройте адрес этого сервера в браузере мобильного устройства.<br/>
-            3. Выберите "Пульт Ведущего".
-          </p>
+        {/* QR Code Section for Host Connection */}
+        <div className="glass-panel p-6 sm:p-8 rounded-2xl sm:rounded-3xl border border-emerald-500/30 shadow-[0_0_25px_rgba(16,185,129,0.15)] flex flex-col md:flex-row items-center gap-6 sm:gap-8">
+          <div className="bg-white p-3 rounded-2xl shadow-[0_0_20px_rgba(16,185,129,0.3)] shrink-0">
+            {hostUrl ? (
+              <QRCodeSVG 
+                value={hostUrl} 
+                size={140}
+                bgColor="#ffffff"
+                fgColor="#050505"
+                level="M"
+              />
+            ) : (
+              <div className="w-[140px] h-[140px] bg-slate-900 animate-pulse rounded-xl" />
+            )}
+          </div>
+
+          <div className="flex-1 flex flex-col gap-2 text-center md:text-left">
+            <div className="flex items-center justify-center md:justify-start gap-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              </span>
+              <h3 className="text-base sm:text-lg font-bold text-emerald-400 uppercase tracking-widest font-mono">
+                QR-код для пульта ведущего
+              </h3>
+            </div>
+            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed font-sans">
+              Наведите камеру смартфона на QR-код, чтобы мгновенно открыть пульт управления игрой на мобильном устройстве.
+            </p>
+            {hostUrl && (
+              <div className="mt-2 flex flex-wrap items-center justify-center md:justify-start gap-2">
+                <code className="bg-black/60 border border-white/10 px-3 py-1.5 rounded-lg text-emerald-300 text-[11px] sm:text-xs font-mono truncate max-w-full">
+                  {hostUrl}
+                </code>
+                <button
+                  onClick={handleCopy}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold font-mono uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 active:scale-95 transition-all cursor-pointer"
+                >
+                  {copied ? '✓ Скопировано' : 'Копировать'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
