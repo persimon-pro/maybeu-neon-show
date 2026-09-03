@@ -154,7 +154,7 @@ const renderSidebarName = (name: string, type: 'teams' | 'players', isOdd: boole
 };
 
 function Display() {
-  const { gameState, dispatch, isConnected, peerCount } = useGameState('display');
+  const { gameState, dispatch, isConnected } = useGameState('display');
 
   // Preload all game images immediately so round transitions have zero delay
   useEffect(() => {

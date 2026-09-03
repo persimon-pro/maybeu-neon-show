@@ -15,11 +15,17 @@ const getRoundName = (roundNum: number): string => {
 };
 
 export function HostPanel() {
-  const { gameState, dispatch, isConnected } = useGameState('host');
+  const { gameState, dispatch, isConnected, roomId, changeRoom } = useGameState('host');
   const [isMenuExpanded, setIsMenuExpanded] = useState(false);
   const [configType, setConfigType] = useState<'teams' | 'players'>('teams');
   const [configCount, setConfigCount] = useState<number>(2);
   const [customNames, setCustomNames] = useState<string[]>([]);
+  const [showRoomModal, setShowRoomModal] = useState(false);
+  const [roomInput, setRoomInput] = useState(roomId);
+
+  useEffect(() => {
+    setRoomInput(roomId);
+  }, [roomId]);
 
   useEffect(() => {
     setCustomNames(prev => {
@@ -56,15 +62,80 @@ export function HostPanel() {
     setIsMenuExpanded(false);
   };
 
+  const handleSaveRoom = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (roomInput.trim()) {
+      changeRoom(roomInput.trim());
+      setShowRoomModal(false);
+    }
+  };
+
+  const renderRoomModal = () => {
+    if (!showRoomModal) return null;
+    return (
+      <div 
+        className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
+        onClick={() => setShowRoomModal(false)}
+      >
+        <div 
+          className="bg-slate-950 border border-white/20 rounded-2xl p-6 max-w-xs w-full flex flex-col gap-4 shadow-2xl"
+          onClick={e => e.stopPropagation()}
+        >
+          <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-cyan-400">
+            Комната подключения
+          </h3>
+          <p className="text-xs text-slate-300">
+            Для управления главный экран и пульт должны находиться в одной комнате.
+          </p>
+          <form onSubmit={handleSaveRoom} className="flex flex-col gap-3">
+            <input 
+              type="text" 
+              value={roomInput}
+              onChange={e => setRoomInput(e.target.value)}
+              placeholder="loft_main"
+              className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-cyan-400"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  changeRoom('loft_main');
+                  setRoomInput('loft_main');
+                  setShowRoomModal(false);
+                }}
+                className="flex-1 py-2 text-xs font-mono rounded-lg bg-white/10 text-slate-300 hover:bg-white/15"
+              >
+                Сброс (loft_main)
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-2 text-xs font-mono font-bold rounded-lg bg-cyan-500 text-black hover:bg-cyan-400"
+              >
+                Сохранить
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
   if (!gameState.gameSettings || !gameState.gameSettings.isConfigured) {
     return (
       <div className="min-h-screen bg-black text-white p-6 font-sans max-w-md mx-auto flex flex-col justify-center gap-6">
+        {renderRoomModal()}
         <div className="text-center">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider mb-3 border border-white/10 bg-white/5">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider mb-3 border border-white/10 bg-white/5">
             <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
             <span className={isConnected ? 'text-emerald-400' : 'text-amber-300'}>
-              {isConnected ? 'Связь с экраном активна' : 'Подключение к экрану...'}
+              {isConnected ? `Связь: ${roomId}` : `Поиск экрана (${roomId})...`}
             </span>
+            <button 
+              onClick={() => { setRoomInput(roomId); setShowRoomModal(true); }}
+              className="text-slate-400 hover:text-cyan-400 text-[10px] underline ml-1 cursor-pointer"
+            >
+              Сменить
+            </button>
           </div>
           <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 uppercase tracking-widest mb-1 drop-shadow-[0_0_15px_rgba(34,211,238,0.3)]">
             Настройка игры
@@ -180,17 +251,24 @@ export function HostPanel() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between">
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider ${
             isConnected 
               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
               : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
           }`}>
             <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-            {isConnected ? 'Связь с экраном: Активна ✓' : 'Поиск экрана...'}
+            {isConnected ? `Связь: ${roomId}` : `Поиск экрана: ${roomId}...`}
           </span>
+          <button 
+            onClick={() => { setRoomInput(roomId); setShowRoomModal(true); }}
+            className="text-slate-400 hover:text-cyan-400 text-[10px] underline font-mono cursor-pointer"
+          >
+            Комната
+          </button>
         </div>
       </div>
+      {renderRoomModal()}
 
       {/* Score Controls */}
       <div className="grid grid-cols-2 gap-3 mb-8">

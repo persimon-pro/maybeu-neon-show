@@ -53,19 +53,30 @@ const CHANNEL_NAME = 'loft_neon_channel';
 const ROOM_STORAGE_KEY = 'loft_neon_room_id';
 
 export function getActiveRoomId(): string {
-  if (typeof window === 'undefined') return 'loft_room_1';
+  if (typeof window === 'undefined') return 'loft_main';
   const params = new URLSearchParams(window.location.search);
   const fromUrl = params.get('room');
-  if (fromUrl) {
-    localStorage.setItem(ROOM_STORAGE_KEY, fromUrl);
-    return fromUrl;
+  if (fromUrl && fromUrl.trim() !== '') {
+    const clean = fromUrl.trim().toLowerCase();
+    localStorage.setItem(ROOM_STORAGE_KEY, clean);
+    return clean;
   }
   let saved = localStorage.getItem(ROOM_STORAGE_KEY);
-  if (!saved) {
-    saved = 'loft_' + Math.random().toString(36).substring(2, 8);
-    localStorage.setItem(ROOM_STORAGE_KEY, saved);
+  // If saved was a temporary random room from previous version (e.g. loft_xxxxxx), migrate to loft_main
+  if (saved && saved.trim() !== '' && !saved.match(/^loft_[a-z0-9]{5,8}$/i)) {
+    return saved.trim().toLowerCase();
   }
-  return saved;
+  const defaultRoom = 'loft_main';
+  localStorage.setItem(ROOM_STORAGE_KEY, defaultRoom);
+  return defaultRoom;
+}
+
+export function setCustomRoomId(newRoom: string): string {
+  const clean = (newRoom.trim() || 'loft_main').toLowerCase();
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(ROOM_STORAGE_KEY, clean);
+  }
+  return clean;
 }
 
 function loadStoredState(): ServerGameState {
@@ -303,36 +314,40 @@ function getSocket(): Socket {
 }
 
 const MQTT_BROKERS = [
+  'wss://test.mosquitto.org:8081/mqtt',
   'wss://broker.emqx.io:8084/mqtt',
-  'wss://broker.hivemq.com:8884/mqtt'
+  'wss://test.mosquitto.org:8081'
 ];
 
 export function useGameState(role: 'display' | 'host' | 'general' = 'general') {
   const [gameState, setGameState] = useState<ServerGameState>(() => loadStoredState());
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isMqttConnected, setIsMqttConnected] = useState(false);
+  const [currentRoom, setCurrentRoom] = useState<string>(() => getActiveRoomId());
 
   const channelRef = useRef<BroadcastChannel | null>(null);
   const stateRef = useRef<ServerGameState>(gameState);
   stateRef.current = gameState;
 
   const mqttClientRef = useRef<MqttClient | null>(null);
-  const roomIdRef = useRef<string>(getActiveRoomId());
+  const roomIdRef = useRef<string>(currentRoom);
+  roomIdRef.current = currentRoom;
   const senderIdRef = useRef<string>('c_' + Math.random().toString(36).substring(2, 7));
+  const pendingActionsRef = useRef<Array<{ topic: string; message: string }>>([]);
 
   // Sync state across local tabs and MQTT
   const broadcastState = useCallback((state: ServerGameState) => {
     saveStoredState(state);
     channelRef.current?.postMessage({ type: 'SYNC_STATE', state });
 
-    // Broadcast master state to MQTT
+    // Broadcast master state to MQTT with retain so late-joining host gets it immediately
     if (mqttClientRef.current && mqttClientRef.current.connected) {
       const topic = `loft_show_rooms/${roomIdRef.current}/state`;
       mqttClientRef.current.publish(topic, JSON.stringify({ 
         type: 'STATE_SYNC', 
         state, 
         sender: senderIdRef.current 
-      }));
+      }), { retain: true, qos: 0 });
     }
   }, []);
 
@@ -380,7 +395,7 @@ export function useGameState(role: 'display' | 'host' | 'general' = 'general') {
 
   // 3. Ultra-Fast MQTT WebSocket Realtime Stream (Zero-Lag Cross-Device)
   useEffect(() => {
-    const room = getActiveRoomId();
+    const room = currentRoom;
     roomIdRef.current = room;
 
     const actionTopic = `loft_show_rooms/${room}/actions`;
@@ -389,82 +404,115 @@ export function useGameState(role: 'display' | 'host' | 'general' = 'general') {
     let client: MqttClient | null = null;
     let brokerIndex = 0;
     let isCleanedUp = false;
+    let reconnectTimer: any = null;
 
     const connectMqtt = () => {
       if (isCleanedUp) return;
       const brokerUrl = MQTT_BROKERS[brokerIndex % MQTT_BROKERS.length];
 
-      client = mqtt.connect(brokerUrl, {
-        clientId: `${role}_${senderIdRef.current}`,
-        clean: true,
-        connectTimeout: 4000,
-        reconnectPeriod: 2000
-      });
-      mqttClientRef.current = client;
+      try {
+        client = mqtt.connect(brokerUrl, {
+          clientId: `${role}_${senderIdRef.current}_${Math.random().toString(36).substring(2, 6)}`,
+          clean: true,
+          connectTimeout: 5000,
+          reconnectPeriod: 2500
+        });
+        mqttClientRef.current = client;
 
-      client.on('connect', () => {
-        if (isCleanedUp) return;
-        setIsMqttConnected(true);
+        client.on('connect', () => {
+          if (isCleanedUp) return;
+          setIsMqttConnected(true);
 
-        client?.subscribe([actionTopic, stateTopic], { qos: 0 });
-
-        // If host connects, request current state from display
-        if (role === 'host') {
-          client?.publish(actionTopic, JSON.stringify({ 
-            type: 'REQUEST_STATE', 
-            sender: senderIdRef.current 
-          }));
-        }
-      });
-
-      client.on('message', (topic, messageBuffer) => {
-        if (isCleanedUp) return;
-        try {
-          const payload = JSON.parse(messageBuffer.toString());
-          if (!payload) return;
-
-          // Ignore own messages
-          if (payload.sender === senderIdRef.current) return;
-
-          if (payload.type === 'ACTION' && payload.action) {
-            const nextState = gameReducer(stateRef.current, payload.action);
-            setGameState(nextState);
-            saveStoredState(nextState);
-            channelRef.current?.postMessage({ type: 'SYNC_STATE', state: nextState });
-
-            // If display, respond with authoritative state sync
-            if (role === 'display' || role === 'general') {
-              broadcastState(nextState);
+          client?.subscribe([actionTopic, stateTopic], { qos: 0 }, (err) => {
+            if (!err && role === 'display') {
+              // Immediately announce current state on connect
+              broadcastState(stateRef.current);
             }
-          } else if (payload.type === 'STATE_SYNC' && payload.state) {
-            setGameState(payload.state);
-            saveStoredState(payload.state);
-            channelRef.current?.postMessage({ type: 'SYNC_STATE', state: payload.state });
-          } else if (payload.type === 'REQUEST_STATE' && (role === 'display' || role === 'general')) {
-            broadcastState(stateRef.current);
-          }
-        } catch (e) {
-          console.warn('MQTT parse error:', e);
-        }
-      });
+          });
 
-      client.on('offline', () => setIsMqttConnected(false));
-      client.on('disconnect', () => setIsMqttConnected(false));
-      client.on('error', (err) => {
-        setIsMqttConnected(false);
-        // Switch to alternative broker on error
-        brokerIndex++;
-      });
+          // Flush queued actions
+          while (pendingActionsRef.current.length > 0) {
+            const item = pendingActionsRef.current.shift();
+            if (item) {
+              client?.publish(item.topic, item.message);
+            }
+          }
+
+          // If host connects, request current state from display
+          if (role === 'host') {
+            client?.publish(actionTopic, JSON.stringify({ 
+              type: 'REQUEST_STATE', 
+              sender: senderIdRef.current 
+            }));
+          }
+        });
+
+        client.on('message', (topic, messageBuffer) => {
+          if (isCleanedUp) return;
+          try {
+            const payload = JSON.parse(messageBuffer.toString());
+            if (!payload) return;
+
+            // Ignore own messages
+            if (payload.sender === senderIdRef.current) return;
+
+            if (payload.type === 'ACTION' && payload.action) {
+              const nextState = gameReducer(stateRef.current, payload.action);
+              setGameState(nextState);
+              saveStoredState(nextState);
+              channelRef.current?.postMessage({ type: 'SYNC_STATE', state: nextState });
+
+              // If display, respond with authoritative state sync
+              if (role === 'display' || role === 'general') {
+                broadcastState(nextState);
+              }
+            } else if (payload.type === 'STATE_SYNC' && payload.state) {
+              setGameState(payload.state);
+              saveStoredState(payload.state);
+              channelRef.current?.postMessage({ type: 'SYNC_STATE', state: payload.state });
+            } else if (payload.type === 'REQUEST_STATE' && (role === 'display' || role === 'general')) {
+              broadcastState(stateRef.current);
+            }
+          } catch (e) {
+            console.warn('MQTT parse error:', e);
+          }
+        });
+
+        const tryNextBroker = () => {
+          if (isCleanedUp) return;
+          setIsMqttConnected(false);
+          if (reconnectTimer) clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(() => {
+            if (isCleanedUp) return;
+            try {
+              client?.end(true);
+            } catch (e) {}
+            brokerIndex++;
+            connectMqtt();
+          }, 4000);
+        };
+
+        client.on('offline', () => setIsMqttConnected(false));
+        client.on('error', (err) => {
+          console.warn('MQTT connection error, trying next broker:', err);
+          tryNextBroker();
+        });
+      } catch (err) {
+        console.warn('MQTT init error:', err);
+      }
     };
 
     connectMqtt();
 
     return () => {
       isCleanedUp = true;
-      client?.end(true);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      try {
+        client?.end(true);
+      } catch (e) {}
       mqttClientRef.current = null;
     };
-  }, [role, broadcastState]);
+  }, [currentRoom, role, broadcastState]);
 
   // Authoritative timer clock on Display only (Never on Host)
   useEffect(() => {
@@ -502,14 +550,23 @@ export function useGameState(role: 'display' | 'host' | 'general' = 'general') {
     }
 
     // 3. Send via ultra-fast MQTT WebSocket binary stream
+    const topic = `loft_show_rooms/${roomIdRef.current}/actions`;
+    const message = JSON.stringify({ 
+      type: 'ACTION', 
+      action, 
+      sender: senderIdRef.current 
+    });
+
     if (mqttClientRef.current && mqttClientRef.current.connected) {
-      const topic = `loft_show_rooms/${roomIdRef.current}/actions`;
-      mqttClientRef.current.publish(topic, JSON.stringify({ 
-        type: 'ACTION', 
-        action, 
-        sender: senderIdRef.current 
-      }));
+      mqttClientRef.current.publish(topic, message);
+    } else {
+      pendingActionsRef.current.push({ topic, message });
     }
+  };
+
+  const changeRoom = (newRoom: string) => {
+    const clean = setCustomRoomId(newRoom);
+    setCurrentRoom(clean);
   };
 
   const isConnected = isSocketConnected || isMqttConnected;
@@ -520,6 +577,7 @@ export function useGameState(role: 'display' | 'host' | 'general' = 'general') {
     isConnected,
     isSocketConnected, 
     isMqttConnected,
-    roomId: roomIdRef.current
+    roomId: currentRoom,
+    changeRoom
   };
 }

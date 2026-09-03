@@ -65,7 +65,8 @@ export function ScoreBoard({ onGoHome }: ScoreBoardProps) {
           title="Открыть QR-код для телефона ведущего"
         >
           <span>📱</span>
-          <span className="hidden md:inline">Пульт</span>
+          <span>Пульт</span>
+          <span className="hidden sm:inline opacity-70">({getActiveRoomId()})</span>
         </button>
 
       </div>
@@ -77,7 +78,7 @@ export function ScoreBoard({ onGoHome }: ScoreBoardProps) {
           onClick={() => setShowQrModal(false)}
         >
           <div 
-            className="glass-panel border border-emerald-500/40 shadow-[0_0_40px_rgba(16,185,129,0.3)] rounded-3xl p-6 sm:p-8 max-w-sm w-full flex flex-col items-center text-center gap-5 relative"
+            className="glass-panel border border-emerald-500/40 shadow-[0_0_40px_rgba(16,185,129,0.3)] rounded-3xl p-6 sm:p-8 max-w-sm w-full flex flex-col items-center text-center gap-4 relative"
             onClick={e => e.stopPropagation()}
           >
             <button
@@ -87,7 +88,7 @@ export function ScoreBoard({ onGoHome }: ScoreBoardProps) {
               ✕
             </button>
 
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-1">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
               <h3 className="text-lg font-bold text-emerald-400 uppercase tracking-widest font-mono">
                 Пульт Ведущего
@@ -106,13 +107,18 @@ export function ScoreBoard({ onGoHome }: ScoreBoardProps) {
               )}
             </div>
 
-            <p className="text-slate-300 text-xs leading-relaxed">
-              Наведите камеру смартфона для подключения пульта ведущего
-            </p>
-
-            <code className="bg-black/60 border border-white/10 px-3 py-1.5 rounded-lg text-emerald-300 text-[11px] font-mono truncate max-w-full">
-              {hostUrl}
-            </code>
+            <div className="flex flex-col gap-1 text-center">
+              <p className="text-white text-xs font-bold font-sans">
+                Наведите камеру смартфона на QR-код
+              </p>
+              <p className="text-slate-400 text-[11px] leading-relaxed">
+                Или введите на телефоне: <span className="text-cyan-400 font-mono">.../host</span>
+              </p>
+              <div className="mt-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/60 border border-emerald-500/30 text-[11px] font-mono text-emerald-300">
+                <span>Комната:</span>
+                <span className="font-bold text-white uppercase">{getActiveRoomId()}</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
