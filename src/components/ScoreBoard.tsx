@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { GameSettings } from '../types';
+import { getActiveRoomId } from '../useGameState';
 
 interface ScoreBoardProps {
   gameSettings: GameSettings;
@@ -13,7 +14,24 @@ export function ScoreBoard({ onGoHome }: ScoreBoardProps) {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setHostUrl(`${window.location.origin}/host`);
+      const room = getActiveRoomId();
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (isLocal) {
+        fetch('/api/lan-info')
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.ip && data.ip !== 'localhost') {
+              setHostUrl(`http://${data.ip}:${data.port || window.location.port || 3000}/host?room=${room}`);
+            } else {
+              setHostUrl(`${window.location.origin}/host?room=${room}`);
+            }
+          })
+          .catch(() => {
+            setHostUrl(`${window.location.origin}/host?room=${room}`);
+          });
+      } else {
+        setHostUrl(`${window.location.origin}/host?room=${room}`);
+      }
     }
   }, []);
 

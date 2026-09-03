@@ -7,11 +7,29 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { gameData } from "./src/data";
 
+import os from "os";
+
+function getLocalIp() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] || []) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return 'localhost';
+}
+
 async function startServer() {
   const app = express();
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
     cors: { origin: "*" }
+  });
+
+  app.get('/api/lan-info', (req, res) => {
+    res.json({ ip: getLocalIp(), port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000 });
   });
 
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;

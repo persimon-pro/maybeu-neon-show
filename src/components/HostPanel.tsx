@@ -15,7 +15,7 @@ const getRoundName = (roundNum: number): string => {
 };
 
 export function HostPanel() {
-  const { gameState, dispatch } = useGameState();
+  const { gameState, dispatch, isConnected } = useGameState('host');
   const [isMenuExpanded, setIsMenuExpanded] = useState(false);
   const [configType, setConfigType] = useState<'teams' | 'players'>('teams');
   const [configCount, setConfigCount] = useState<number>(2);
@@ -60,6 +60,12 @@ export function HostPanel() {
     return (
       <div className="min-h-screen bg-black text-white p-6 font-sans max-w-md mx-auto flex flex-col justify-center gap-6">
         <div className="text-center">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider mb-3 border border-white/10 bg-white/5">
+            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span className={isConnected ? 'text-emerald-400' : 'text-amber-300'}>
+              {isConnected ? 'Связь с экраном активна' : 'Подключение к экрану...'}
+            </span>
+          </div>
           <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 uppercase tracking-widest mb-1 drop-shadow-[0_0_15px_rgba(34,211,238,0.3)]">
             Настройка игры
           </h1>
@@ -153,23 +159,36 @@ export function HostPanel() {
 
   return (
     <div className="min-h-screen bg-black text-white p-4 font-sans max-w-md mx-auto">
-      <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-cyan-400 uppercase tracking-wider">
-          Пульт ведущего
-        </h1>
-        <div className="flex gap-2">
-          <button 
-            onClick={() => dispatch({ type: 'RESET_SCORES' })}
-            className="text-xs border border-amber-500/30 text-amber-400 bg-amber-500/10 px-2.5 py-1.5 rounded-lg font-bold hover:bg-amber-500/20 active:scale-95 transition-all"
-          >
-            Сброс 🔄
-          </button>
-          <button 
-            onClick={() => dispatch({ type: 'RESET_GAME_SETTINGS' })}
-            className="text-xs border border-red-500/30 text-red-400 bg-red-500/10 px-2.5 py-1.5 rounded-lg font-bold hover:bg-red-500/20 active:scale-95 transition-all"
-          >
-            Настройки ⚙️
-          </button>
+      <div className="flex flex-col gap-3 mb-6 border-b border-white/10 pb-4">
+        <div className="flex justify-between items-center">
+          <h1 className="text-xl sm:text-2xl font-bold text-cyan-400 uppercase tracking-wider">
+            Пульт ведущего
+          </h1>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => dispatch({ type: 'RESET_SCORES' })}
+              className="text-xs border border-amber-500/30 text-amber-400 bg-amber-500/10 px-2.5 py-1.5 rounded-lg font-bold hover:bg-amber-500/20 active:scale-95 transition-all"
+            >
+              Сброс 🔄
+            </button>
+            <button 
+              onClick={() => dispatch({ type: 'RESET_GAME_SETTINGS' })}
+              className="text-xs border border-red-500/30 text-red-400 bg-red-500/10 px-2.5 py-1.5 rounded-lg font-bold hover:bg-red-500/20 active:scale-95 transition-all"
+            >
+              Настройки ⚙️
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider ${
+            isConnected 
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
+              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            {isConnected ? 'Связь с экраном: Активна ✓' : 'Поиск экрана...'}
+          </span>
         </div>
       </div>
 

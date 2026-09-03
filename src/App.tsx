@@ -10,7 +10,8 @@ import { Round6 } from './components/Round6';
 import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { HostPanel } from './components/HostPanel';
-import { useGameState } from './useGameState';
+import { useGameState, getActiveRoomId } from './useGameState';
+import { gameData } from './data';
 
 function SelectScreen() {
   const [hostUrl, setHostUrl] = useState('');
@@ -18,7 +19,24 @@ function SelectScreen() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setHostUrl(`${window.location.origin}/host`);
+      const room = getActiveRoomId();
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (isLocal) {
+        fetch('/api/lan-info')
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.ip && data.ip !== 'localhost') {
+              setHostUrl(`http://${data.ip}:${data.port || window.location.port || 3000}/host?room=${room}`);
+            } else {
+              setHostUrl(`${window.location.origin}/host?room=${room}`);
+            }
+          })
+          .catch(() => {
+            setHostUrl(`${window.location.origin}/host?room=${room}`);
+          });
+      } else {
+        setHostUrl(`${window.location.origin}/host?room=${room}`);
+      }
     }
   }, []);
 
@@ -136,7 +154,20 @@ const renderSidebarName = (name: string, type: 'teams' | 'players', isOdd: boole
 };
 
 function Display() {
-  const { gameState, dispatch } = useGameState();
+  const { gameState, dispatch, isConnected, peerCount } = useGameState('display');
+
+  // Preload all game images immediately so round transitions have zero delay
+  useEffect(() => {
+    const allPhotos = [
+      ...gameData.round2.items.map(i => i.photo),
+      ...gameData.round4.items.map(i => i.photo),
+      ...gameData.round5.items.map(i => i.photo),
+    ];
+    allPhotos.forEach(src => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, []);
 
   if (!gameState) {
     return <div className="min-h-screen text-white flex items-center justify-center font-mono text-xl">CONNECTING TO NEURAL CORE...</div>;

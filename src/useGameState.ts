@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
+import mqtt, { MqttClient } from 'mqtt';
 import { ServerGameState } from './types';
 import { gameData } from './data';
 
@@ -49,6 +50,23 @@ export const initialGameState: ServerGameState = {
 
 const STORAGE_KEY = 'loft_neon_game_state_v1';
 const CHANNEL_NAME = 'loft_neon_channel';
+const ROOM_STORAGE_KEY = 'loft_neon_room_id';
+
+export function getActiveRoomId(): string {
+  if (typeof window === 'undefined') return 'loft_room_1';
+  const params = new URLSearchParams(window.location.search);
+  const fromUrl = params.get('room');
+  if (fromUrl) {
+    localStorage.setItem(ROOM_STORAGE_KEY, fromUrl);
+    return fromUrl;
+  }
+  let saved = localStorage.getItem(ROOM_STORAGE_KEY);
+  if (!saved) {
+    saved = 'loft_' + Math.random().toString(36).substring(2, 8);
+    localStorage.setItem(ROOM_STORAGE_KEY, saved);
+  }
+  return saved;
+}
 
 function loadStoredState(): ServerGameState {
   try {
@@ -65,12 +83,11 @@ function loadStoredState(): ServerGameState {
 function saveStoredState(state: ServerGameState) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (e) {
-    // Ignore quota errors
-  }
+  } catch (e) {}
 }
 
 export function gameReducer(prevState: ServerGameState, action: any): ServerGameState {
+  if (!action || !action.type) return prevState;
   const state: ServerGameState = JSON.parse(JSON.stringify(prevState));
 
   switch (action.type) {
@@ -272,12 +289,12 @@ export function gameReducer(prevState: ServerGameState, action: any): ServerGame
 
 let socketInstance: Socket | null = null;
 
-export function getSocket(): Socket {
+function getSocket(): Socket {
   if (!socketInstance) {
     const customUrl = (import.meta as any).env?.VITE_SOCKET_URL;
     const socketUrl = customUrl || (typeof window !== 'undefined' ? window.location.origin : '');
     socketInstance = io(socketUrl, {
-      reconnectionAttempts: 3,
+      reconnectionAttempts: 5,
       timeout: 3000,
       autoConnect: true
     });
@@ -285,15 +302,42 @@ export function getSocket(): Socket {
   return socketInstance;
 }
 
-export function useGameState() {
+const MQTT_BROKERS = [
+  'wss://broker.emqx.io:8084/mqtt',
+  'wss://broker.hivemq.com:8884/mqtt'
+];
+
+export function useGameState(role: 'display' | 'host' | 'general' = 'general') {
   const [gameState, setGameState] = useState<ServerGameState>(() => loadStoredState());
   const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const [isMqttConnected, setIsMqttConnected] = useState(false);
+
   const channelRef = useRef<BroadcastChannel | null>(null);
   const stateRef = useRef<ServerGameState>(gameState);
   stateRef.current = gameState;
 
+  const mqttClientRef = useRef<MqttClient | null>(null);
+  const roomIdRef = useRef<string>(getActiveRoomId());
+  const senderIdRef = useRef<string>('c_' + Math.random().toString(36).substring(2, 7));
+
+  // Sync state across local tabs and MQTT
+  const broadcastState = useCallback((state: ServerGameState) => {
+    saveStoredState(state);
+    channelRef.current?.postMessage({ type: 'SYNC_STATE', state });
+
+    // Broadcast master state to MQTT
+    if (mqttClientRef.current && mqttClientRef.current.connected) {
+      const topic = `loft_show_rooms/${roomIdRef.current}/state`;
+      mqttClientRef.current.publish(topic, JSON.stringify({ 
+        type: 'STATE_SYNC', 
+        state, 
+        sender: senderIdRef.current 
+      }));
+    }
+  }, []);
+
+  // 1. Local BroadcastChannel (instant for tabs on same browser)
   useEffect(() => {
-    // BroadcastChannel for cross-tab sync without server (e.g. Vercel)
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(CHANNEL_NAME);
       channelRef.current = bc;
@@ -305,17 +349,17 @@ export function useGameState() {
       };
     }
 
-    // Socket.io connection
+    return () => {
+      channelRef.current?.close();
+    };
+  }, []);
+
+  // 2. Local Socket.io connection (for Node.js dev server & Render)
+  useEffect(() => {
     const s = getSocket();
 
-    const handleConnect = () => {
-      setIsSocketConnected(true);
-    };
-
-    const handleDisconnect = () => {
-      setIsSocketConnected(false);
-    };
-
+    const handleConnect = () => setIsSocketConnected(true);
+    const handleDisconnect = () => setIsSocketConnected(false);
     const handleStateUpdate = (serverState: ServerGameState) => {
       setIsSocketConnected(true);
       setGameState(serverState);
@@ -331,13 +375,101 @@ export function useGameState() {
       s.off('connect', handleConnect);
       s.off('disconnect', handleDisconnect);
       s.off('state_update', handleStateUpdate);
-      channelRef.current?.close();
     };
   }, []);
 
-  // Client-side timer ticker when socket is not connected
+  // 3. Ultra-Fast MQTT WebSocket Realtime Stream (Zero-Lag Cross-Device)
   useEffect(() => {
-    if (isSocketConnected) return;
+    const room = getActiveRoomId();
+    roomIdRef.current = room;
+
+    const actionTopic = `loft_show_rooms/${room}/actions`;
+    const stateTopic = `loft_show_rooms/${room}/state`;
+
+    let client: MqttClient | null = null;
+    let brokerIndex = 0;
+    let isCleanedUp = false;
+
+    const connectMqtt = () => {
+      if (isCleanedUp) return;
+      const brokerUrl = MQTT_BROKERS[brokerIndex % MQTT_BROKERS.length];
+
+      client = mqtt.connect(brokerUrl, {
+        clientId: `${role}_${senderIdRef.current}`,
+        clean: true,
+        connectTimeout: 4000,
+        reconnectPeriod: 2000
+      });
+      mqttClientRef.current = client;
+
+      client.on('connect', () => {
+        if (isCleanedUp) return;
+        setIsMqttConnected(true);
+
+        client?.subscribe([actionTopic, stateTopic], { qos: 0 });
+
+        // If host connects, request current state from display
+        if (role === 'host') {
+          client?.publish(actionTopic, JSON.stringify({ 
+            type: 'REQUEST_STATE', 
+            sender: senderIdRef.current 
+          }));
+        }
+      });
+
+      client.on('message', (topic, messageBuffer) => {
+        if (isCleanedUp) return;
+        try {
+          const payload = JSON.parse(messageBuffer.toString());
+          if (!payload) return;
+
+          // Ignore own messages
+          if (payload.sender === senderIdRef.current) return;
+
+          if (payload.type === 'ACTION' && payload.action) {
+            const nextState = gameReducer(stateRef.current, payload.action);
+            setGameState(nextState);
+            saveStoredState(nextState);
+            channelRef.current?.postMessage({ type: 'SYNC_STATE', state: nextState });
+
+            // If display, respond with authoritative state sync
+            if (role === 'display' || role === 'general') {
+              broadcastState(nextState);
+            }
+          } else if (payload.type === 'STATE_SYNC' && payload.state) {
+            setGameState(payload.state);
+            saveStoredState(payload.state);
+            channelRef.current?.postMessage({ type: 'SYNC_STATE', state: payload.state });
+          } else if (payload.type === 'REQUEST_STATE' && (role === 'display' || role === 'general')) {
+            broadcastState(stateRef.current);
+          }
+        } catch (e) {
+          console.warn('MQTT parse error:', e);
+        }
+      });
+
+      client.on('offline', () => setIsMqttConnected(false));
+      client.on('disconnect', () => setIsMqttConnected(false));
+      client.on('error', (err) => {
+        setIsMqttConnected(false);
+        // Switch to alternative broker on error
+        brokerIndex++;
+      });
+    };
+
+    connectMqtt();
+
+    return () => {
+      isCleanedUp = true;
+      client?.end(true);
+      mqttClientRef.current = null;
+    };
+  }, [role, broadcastState]);
+
+  // Authoritative timer clock on Display only (Never on Host)
+  useEffect(() => {
+    if (isSocketConnected) return; // Server handles clock if Socket.io is running
+    if (role === 'host') return;   // Host never runs the clock
 
     const interval = setInterval(() => {
       const current = stateRef.current;
@@ -347,26 +479,47 @@ export function useGameState() {
       if (r1Running || r3Running) {
         const nextState = gameReducer(current, { type: 'TICK' });
         setGameState(nextState);
-        saveStoredState(nextState);
-        channelRef.current?.postMessage({ type: 'SYNC_STATE', state: nextState });
+        broadcastState(nextState);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isSocketConnected]);
+  }, [isSocketConnected, role, broadcastState]);
 
   const dispatch = (action: any) => {
+    if (!action || !action.type) return;
+
+    // 1. Optimistic immediate local UI update (0ms latency for host)
+    const nextState = gameReducer(stateRef.current, action);
+    setGameState(nextState);
+    saveStoredState(nextState);
+    channelRef.current?.postMessage({ type: 'SYNC_STATE', state: nextState });
+
+    // 2. Send via Socket.io if running
     const s = getSocket();
     if (s && s.connected) {
       s.emit('action', action);
-    } else {
-      // Local state fallback with BroadcastChannel
-      const nextState = gameReducer(stateRef.current, action);
-      setGameState(nextState);
-      saveStoredState(nextState);
-      channelRef.current?.postMessage({ type: 'SYNC_STATE', state: nextState });
+    }
+
+    // 3. Send via ultra-fast MQTT WebSocket binary stream
+    if (mqttClientRef.current && mqttClientRef.current.connected) {
+      const topic = `loft_show_rooms/${roomIdRef.current}/actions`;
+      mqttClientRef.current.publish(topic, JSON.stringify({ 
+        type: 'ACTION', 
+        action, 
+        sender: senderIdRef.current 
+      }));
     }
   };
 
-  return { gameState, dispatch, isSocketConnected };
+  const isConnected = isSocketConnected || isMqttConnected;
+
+  return { 
+    gameState, 
+    dispatch, 
+    isConnected,
+    isSocketConnected, 
+    isMqttConnected,
+    roomId: roomIdRef.current
+  };
 }
