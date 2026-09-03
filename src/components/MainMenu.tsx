@@ -15,42 +15,38 @@ export function MainMenu({ onSelectRound }: MainMenuProps) {
   ];
 
   return (
-    <div className="pt-20 sm:pt-24 md:pt-32 pb-8 sm:pb-16 px-4 sm:px-8 md:px-12 min-h-screen flex flex-col items-center max-w-[1920px] mx-auto">
-      <div className="mb-8 sm:mb-16 flex flex-col items-center">
-        <h1 className="text-2xl sm:text-4xl md:text-6xl font-black text-cyan-400 tracking-[0.1em] sm:tracking-[0.2em] uppercase glow-cyan drop-shadow-md text-center">
+    <div className="w-full h-full p-3 sm:p-5 md:p-6 flex flex-col items-center justify-between overflow-hidden max-w-7xl mx-auto">
+      <div className="text-center shrink-0 my-1 sm:my-2">
+        <h1 className="text-xl sm:text-3xl md:text-5xl font-black text-cyan-400 tracking-[0.15em] uppercase glow-cyan drop-shadow-md">
           ВЫБЕРИТЕ РАУНД
         </h1>
-        <p className="text-[8px] sm:text-[10px] font-mono opacity-50 mt-2 sm:mt-4 uppercase tracking-[0.2em] sm:tracking-[0.3em]">
+        <p className="text-[8px] sm:text-[10px] font-mono opacity-50 mt-1 uppercase tracking-[0.25em]">
           made by LOFT
         </p>
       </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-10 w-full max-w-7xl">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-4 md:gap-6 w-full flex-1 min-h-0 my-auto py-2">
         {rounds.map((round) => (
           <button
             key={round.id}
             onClick={() => onSelectRound(round.id)}
-            className={`
-              glass-panel group relative overflow-hidden rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 
-              transition-all duration-300 hover:scale-[1.03] hover:glow-cyan
-              flex flex-col items-center justify-center text-center h-40 sm:h-52 md:h-64
-            `}
+            className="glass-panel group relative overflow-hidden rounded-xl sm:rounded-2xl p-2 sm:p-4 md:p-6 transition-all duration-300 hover:scale-[1.02] hover:glow-cyan flex flex-col items-center justify-center text-center h-full min-h-0 cursor-pointer"
           >
-            {/* Background gradient effect on hover */}
-            <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity bg-cyan-500`} />
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity bg-cyan-500" />
             
-            <div className={`
-              text-3xl sm:text-5xl md:text-7xl font-black mb-1 sm:mb-4 opacity-30 group-hover:opacity-100 transition-opacity
-              text-cyan-500 font-mono
-            `}>
+            <div className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black mb-1 opacity-30 group-hover:opacity-100 transition-opacity text-cyan-500 font-mono">
               0{round.id}
             </div>
             
-            <h3 className="text-base sm:text-xl md:text-2xl font-bold text-white tracking-wider sm:tracking-widest uppercase">
+            <h3 className="text-xs sm:text-base md:text-lg lg:text-xl font-bold text-white tracking-wider uppercase line-clamp-2">
               {round.data.title}
             </h3>
           </button>
         ))}
+      </div>
+
+      <div className="shrink-0 text-center text-[9px] sm:text-[11px] font-mono opacity-40 uppercase tracking-[0.2em] my-1">
+        Управление с пульта ведущего (/host)
       </div>
     </div>
   );

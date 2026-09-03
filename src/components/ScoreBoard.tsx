@@ -11,6 +11,23 @@ interface ScoreBoardProps {
 export function ScoreBoard({ onGoHome }: ScoreBoardProps) {
   const [showQrModal, setShowQrModal] = useState(false);
   const [hostUrl, setHostUrl] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -37,12 +54,13 @@ export function ScoreBoard({ onGoHome }: ScoreBoardProps) {
 
   return (
     <>
-      <div className="fixed top-0 left-0 w-full h-16 md:h-24 glass-panel flex items-center justify-between px-3 sm:px-6 md:px-8 z-50">
+      <header className="w-full h-14 sm:h-16 md:h-18 shrink-0 glass-panel flex items-center justify-between px-3 sm:px-6 md:px-8 z-30 border-b border-white/10 select-none">
         
         {/* Left spacer / back to home */}
         <button 
           onClick={onGoHome}
-          className="text-slate-400 hover:text-cyan-400 font-mono text-xs uppercase tracking-widest flex items-center gap-1.5 transition-colors cursor-pointer px-2 py-1 rounded-lg hover:bg-white/5"
+          className="text-slate-400 hover:text-cyan-400 font-mono text-xs uppercase tracking-widest flex items-center gap-1.5 transition-colors cursor-pointer px-2.5 py-1.5 rounded-lg hover:bg-white/5"
+          title="Вернуться в главное меню"
         >
           <span>🏠</span>
           <span className="hidden sm:inline">Меню</span>
@@ -53,23 +71,36 @@ export function ScoreBoard({ onGoHome }: ScoreBoardProps) {
           onClick={onGoHome}
           className="group flex flex-col items-center justify-center cursor-pointer hover:scale-105 transition-all mx-2 shrink-0"
         >
-          <span className="text-xs sm:text-lg md:text-2xl lg:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 drop-shadow-[0_0_15px_rgba(0,229,255,0.4)] uppercase tracking-[0.1em] sm:tracking-[0.2em] whitespace-nowrap">
+          <span className="text-xs sm:text-lg md:text-2xl lg:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 drop-shadow-[0_0_15px_rgba(0,229,255,0.4)] uppercase tracking-[0.1em] sm:tracking-[0.2em] whitespace-nowrap">
             LOFT SHOW
           </span>
         </button>
 
-        {/* Right - QR Code button for host */}
-        <button
-          onClick={() => setShowQrModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-mono text-xs uppercase tracking-wider active:scale-95 transition-all cursor-pointer shadow-[0_0_10px_rgba(16,185,129,0.2)]"
-          title="Открыть QR-код для телефона ведущего"
-        >
-          <span>📱</span>
-          <span>Пульт</span>
-          <span className="hidden sm:inline opacity-70">({getActiveRoomId()})</span>
-        </button>
+        {/* Right - Controls */}
+        <div className="flex items-center gap-2">
+          {/* Fullscreen Button */}
+          <button
+            onClick={toggleFullscreen}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 font-mono text-xs uppercase tracking-wider active:scale-95 transition-all cursor-pointer"
+            title={isFullscreen ? 'Выйти из полноэкранного режима' : 'Во весь экран (для ТВ и проектора)'}
+          >
+            <span>{isFullscreen ? '✕' : '⛶'}</span>
+            <span className="hidden md:inline">{isFullscreen ? 'Окно' : 'Экран'}</span>
+          </button>
 
-      </div>
+          {/* QR Code button for host */}
+          <button
+            onClick={() => setShowQrModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-mono text-xs uppercase tracking-wider active:scale-95 transition-all cursor-pointer shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+            title="Открыть QR-код для телефона ведущего"
+          >
+            <span>📱</span>
+            <span>Пульт</span>
+            <span className="hidden sm:inline opacity-70">({getActiveRoomId()})</span>
+          </button>
+        </div>
+
+      </header>
 
       {/* QR Code Modal */}
       {showQrModal && (

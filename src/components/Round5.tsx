@@ -23,31 +23,31 @@ export function Round5({ gameState }: Round5Props) {
 
   if (roundEnd || !currentItem) {
     return (
-      <div className="pt-20 sm:pt-24 md:pt-32 px-4 min-h-screen flex flex-col items-center justify-center text-center">
-        <h2 className="text-3xl sm:text-5xl md:text-7xl font-black text-indigo-400 drop-shadow-[0_0_20px_rgba(129,140,248,0.8)] mb-4 sm:mb-8 uppercase tracking-widest">
+      <div className="w-full h-full p-4 flex flex-col items-center justify-center text-center">
+        <h2 className="text-2xl sm:text-4xl md:text-6xl font-black text-indigo-400 drop-shadow-[0_0_20px_rgba(129,140,248,0.8)] mb-4 uppercase tracking-widest text-center">
           Кадры закончились!
         </h2>
-        <div className="text-sm sm:text-xl text-slate-400 font-mono tracking-widest uppercase">
-           ОЖИДАНИЕ ПУЛЬТА ВЕДУЩЕГО...
+        <div className="text-xs sm:text-base text-slate-400 font-mono tracking-widest uppercase">
+          ОЖИДАНИЕ ПУЛЬТА ВЕДУЩЕГО...
         </div>
       </div>
     );
   }
 
   return (
-    <div className="pt-20 sm:pt-24 md:pt-32 pb-6 sm:pb-12 px-4 sm:px-8 min-h-screen flex flex-col items-center justify-between max-w-[1920px] mx-auto">
+    <div className="w-full h-full p-2 sm:p-4 md:p-5 flex flex-col items-center justify-between overflow-hidden max-w-7xl mx-auto">
       
       {/* Title & Rules */}
-      <div className="text-center mt-2 sm:mt-4">
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold uppercase tracking-[0.1em] sm:tracking-[0.2em] text-indigo-400 drop-shadow-[0_0_15px_rgba(129,140,248,0.5)]">
+      <div className="text-center shrink-0 my-1">
+        <h1 className="text-base sm:text-xl md:text-2xl font-bold uppercase tracking-[0.15em] text-indigo-400 drop-shadow-[0_0_15px_rgba(129,140,248,0.5)]">
           // {round.title}
         </h1>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center w-full mt-4 sm:mt-8">
-        <div className="w-full max-w-5xl glass-panel rounded-2xl sm:rounded-[3rem] p-4 sm:p-8 md:p-12 flex flex-col items-center justify-center relative overflow-hidden">
+      <div className="flex-1 min-h-0 w-full flex flex-col items-center justify-center my-auto py-1">
+        <div className="w-full max-w-4xl h-full max-h-[75vh] glass-panel rounded-2xl sm:rounded-3xl p-3 sm:p-5 flex flex-col items-center justify-between relative overflow-hidden shadow-2xl">
           
-          <div className="relative w-full max-h-[45vh] md:max-h-[55vh] aspect-video rounded-xl sm:rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black/50 flex items-center justify-center">
+          <div className="relative flex-1 min-h-0 w-full rounded-xl sm:rounded-2xl overflow-hidden border border-white/10 bg-black/60 flex items-center justify-center">
             <img 
               key={currentItem.photo}
               src={currentItem.photo} 
@@ -55,26 +55,26 @@ export function Round5({ gameState }: Round5Props) {
               loading="eager"
               decoding="sync"
               referrerPolicy="no-referrer"
-              className={`w-full h-full object-cover ${isAnswerRevealed ? 'opacity-40 blur-sm' : ''}`}
+              className={`w-auto h-auto max-w-full max-h-full object-contain select-none transition-all ${isAnswerRevealed ? 'opacity-35 blur-[2px]' : ''}`}
             />
-            {/* Overlay for answer: appears only when revealed, disappears instantly on next */}
+            {/* Overlay for answer */}
             {isAnswerRevealed && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-4 sm:p-8 z-20">
-                <h2 className="text-xl sm:text-3xl md:text-5xl lg:text-6xl text-center font-black text-indigo-300 uppercase tracking-widest leading-tight drop-shadow-[0_0_30px_rgba(0,0,0,0.8)]">
+              <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-8 z-20 animate-fade-in">
+                <h2 className="text-xl sm:text-3xl md:text-5xl lg:text-6xl text-center font-black text-indigo-300 uppercase tracking-wider leading-tight drop-shadow-[0_0_30px_rgba(0,0,0,0.8)]">
                   {currentItem.title}
                 </h2>
               </div>
             )}
           </div>
           
-          <div className="mt-4 sm:mt-8 text-[8px] sm:text-[10px] text-indigo-400/80 font-mono tracking-[0.2em] sm:tracking-[0.4em] uppercase z-10 flex items-center">
-             КАДР {itemIndex + 1} ИЗ {round.items.length} <span className="text-white/30 mx-2 sm:mx-3">//</span> CINEMA_SCAN_ACTIVE
+          <div className="shrink-0 mt-2 text-[9px] sm:text-xs text-indigo-400/80 font-mono tracking-[0.2em] uppercase z-10 flex items-center">
+             КАДР {itemIndex + 1} ИЗ {round.items.length} <span className="text-white/30 mx-2">//</span> CINEMA_SCAN_ACTIVE
           </div>
         </div>
       </div>
 
       {/* Controls info */}
-      <div className="mt-6 sm:mt-12 text-[8px] sm:text-[10px] font-mono opacity-50 uppercase tracking-[0.2em] sm:tracking-[0.3em]">
+      <div className="shrink-0 text-center text-[9px] sm:text-[11px] font-mono opacity-40 uppercase tracking-[0.2em] my-1">
          Управление с пульта ведущего (/host)
       </div>
 

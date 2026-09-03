@@ -199,54 +199,58 @@ function Display() {
   const showSidebar = gameState.currentRound !== null && gameState.gameSettings?.isConfigured;
 
   return (
-    <div className="min-h-screen font-sans selection:bg-cyan-500/30">
+    <div className="h-screen h-[100dvh] w-screen overflow-hidden flex flex-col font-sans selection:bg-cyan-500/30 relative">
       <ScoreBoard 
         gameSettings={gameState.gameSettings} 
         onGoHome={() => dispatch({ type: 'SET_ROUND', round: null })}
       />
       
-      <main className={`relative z-10 w-full h-full transition-all duration-300 ${showSidebar ? 'pr-0 lg:pr-80' : ''}`}>
-        {renderRound()}
-      </main>
+      <div className="flex-1 min-h-0 w-full flex overflow-hidden relative z-10">
+        <main className="flex-1 min-w-0 min-h-0 h-full flex flex-col overflow-hidden">
+          {renderRound()}
+        </main>
 
-      {showSidebar && (
-        <aside className="fixed right-4 top-20 md:top-28 bottom-4 w-72 z-40 glass-panel p-6 flex flex-col border border-white/10 shadow-2xl rounded-2xl overflow-y-auto animate-fade-in">
-          <div className="border-b border-white/10 pb-3 mb-4 text-center">
-            <h3 className="text-xs uppercase font-mono tracking-[0.2em] text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.4)] font-bold">
-              ТАБЛИЦА ЛИДЕРОВ
-            </h3>
-            <p className="text-[9px] font-mono opacity-40 uppercase tracking-widest mt-1">
-              // Текущий счет
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            {gameState.gameSettings.participants.map((p) => (
-              <div 
-                key={p.id} 
-                className={`
-                  flex items-center justify-between p-3 rounded-xl border bg-white/5 shadow-md transition-all
-                  ${p.id % 2 === 1 
-                    ? 'border-cyan-500/20 shadow-cyan-500/5 hover:border-cyan-500/40 hover:shadow-cyan-500/10' 
-                    : 'border-purple-500/20 shadow-purple-500/5 hover:border-purple-500/40 hover:shadow-purple-500/10'}
-                `}
-              >
-                {renderSidebarName(p.name, gameState.gameSettings.type, p.id % 2 === 1)}
-                <span 
-                  className={`
-                    text-3xl font-black font-mono tracking-wider
-                    ${p.id % 2 === 1 
-                      ? 'text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.7)]' 
-                      : 'text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.7)]'}
-                  `}
-                >
-                  {p.score}
-                </span>
+        {showSidebar && (
+          <aside className="shrink-0 w-48 sm:w-56 md:w-64 lg:w-72 h-full py-2 sm:py-3 pr-2 sm:pr-4 flex flex-col min-h-0 z-20 animate-fade-in">
+            <div className="glass-panel w-full h-full p-3 sm:p-4 rounded-2xl flex flex-col border border-white/10 shadow-2xl overflow-hidden">
+              <div className="border-b border-white/10 pb-2 mb-2 text-center shrink-0">
+                <h3 className="text-xs uppercase font-mono tracking-[0.2em] text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.4)] font-bold">
+                  ТАБЛИЦА ЛИДЕРОВ
+                </h3>
+                <p className="text-[9px] font-mono opacity-40 uppercase tracking-widest">
+                  // Текущий счет
+                </p>
               </div>
-            ))}
-          </div>
-        </aside>
-      )}
+
+              <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 pr-1">
+                {gameState.gameSettings.participants.map((p) => (
+                  <div 
+                    key={p.id} 
+                    className={`
+                      flex items-center justify-between p-2 sm:p-2.5 rounded-xl border bg-white/5 shadow-md transition-all shrink-0
+                      ${p.id % 2 === 1 
+                        ? 'border-cyan-500/20 shadow-cyan-500/5' 
+                        : 'border-purple-500/20 shadow-purple-500/5'}
+                    `}
+                  >
+                    {renderSidebarName(p.name, gameState.gameSettings.type, p.id % 2 === 1)}
+                    <span 
+                      className={`
+                        text-xl sm:text-2xl font-black font-mono tracking-wider ml-2
+                        ${p.id % 2 === 1 
+                          ? 'text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.7)]' 
+                          : 'text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.7)]'}
+                      `}
+                    >
+                      {p.score}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </aside>
+        )}
+      </div>
       
       {/* Global Background Elements */}
       <div className="atmosphere" />

@@ -23,33 +23,34 @@ export function Round2({ gameState }: Round2Props) {
 
   if (roundEnd || !currentItem) {
     return (
-      <div className="pt-20 sm:pt-24 md:pt-32 px-4 min-h-screen flex flex-col items-center justify-center text-center">
-        <h2 className="text-3xl sm:text-5xl md:text-7xl font-black text-fuchsia-400 drop-shadow-[0_0_20px_rgba(192,38,211,0.8)] mb-4 sm:mb-8 uppercase tracking-widest">
+      <div className="w-full h-full p-4 flex flex-col items-center justify-center text-center">
+        <h2 className="text-2xl sm:text-4xl md:text-6xl font-black text-fuchsia-400 drop-shadow-[0_0_20px_rgba(192,38,211,0.8)] mb-4 uppercase tracking-widest">
           Фотографии закончились!
         </h2>
-        <div className="text-sm sm:text-xl text-slate-400 font-mono tracking-widest uppercase">
-           ОЖИДАНИЕ ПУЛЬТА ВЕДУЩЕГО...
+        <div className="text-xs sm:text-base text-slate-400 font-mono tracking-widest uppercase">
+          ОЖИДАНИЕ ПУЛЬТА ВЕДУЩЕГО...
         </div>
       </div>
     );
   }
 
   return (
-    <div className="pt-20 sm:pt-24 md:pt-32 pb-6 sm:pb-12 px-4 sm:px-8 min-h-screen flex flex-col items-center justify-between max-w-[1920px] mx-auto">
+    <div className="w-full h-full p-2 sm:p-4 md:p-5 flex flex-col items-center justify-between overflow-hidden max-w-7xl mx-auto">
       
       {/* Title & Rules */}
-      <div className="text-center mt-2 sm:mt-4">
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold uppercase tracking-[0.1em] sm:tracking-[0.2em] text-fuchsia-400 drop-shadow-[0_0_15px_rgba(192,38,211,0.5)]">
+      <div className="text-center shrink-0 my-1">
+        <h1 className="text-base sm:text-xl md:text-2xl font-bold uppercase tracking-[0.15em] text-fuchsia-400 drop-shadow-[0_0_15px_rgba(192,38,211,0.5)]">
           // {round.title}
         </h1>
       </div>
 
       {/* Main Game Area */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full mt-4 sm:mt-8">
+      <div className="flex-1 min-h-0 w-full flex flex-col items-center justify-center my-auto py-1">
         
-        <div className="w-full max-w-5xl glass-panel rounded-2xl sm:rounded-[3rem] p-4 sm:p-8 md:p-12 flex flex-col items-center justify-center relative overflow-hidden">
+        <div className="w-full max-w-4xl h-full max-h-[75vh] glass-panel rounded-2xl sm:rounded-3xl p-3 sm:p-5 flex flex-col items-center justify-between relative overflow-hidden shadow-2xl">
           
-          <div className="relative w-full max-h-[45vh] md:max-h-[55vh] aspect-video rounded-xl sm:rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black/50 flex items-center justify-center">
+          {/* Photo container that scales gracefully within available height */}
+          <div className="relative flex-1 min-h-0 w-full rounded-xl sm:rounded-2xl overflow-hidden border border-white/10 bg-black/60 flex items-center justify-center">
             <img 
               key={currentItem.photo}
               src={currentItem.photo} 
@@ -57,37 +58,37 @@ export function Round2({ gameState }: Round2Props) {
               loading="eager"
               decoding="sync"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-contain"
+              className="w-auto h-auto max-w-full max-h-full object-contain select-none"
             />
 
-            {/* Overlay for answer: only visible when isAnswerRevealed is true, disappears instantly on next item */}
+            {/* Overlay for answer */}
             {isAnswerRevealed && (
-              <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center z-20">
-                <div className="text-5xl sm:text-7xl md:text-[8rem] font-black text-cyan-400 drop-shadow-[0_0_30px_rgba(0,229,255,0.8)]">
+              <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center z-20 animate-fade-in">
+                <div className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-black text-cyan-400 drop-shadow-[0_0_30px_rgba(0,229,255,0.8)] leading-none">
                   {currentItem.realAge}
                 </div>
-                <div className="text-sm sm:text-2xl text-slate-300 font-mono mt-2 sm:mt-4 uppercase tracking-widest">
+                <div className="text-base sm:text-2xl text-slate-300 font-mono mt-2 uppercase tracking-widest">
                   лет
                 </div>
               </div>
             )}
           </div>
 
-          {/* Actor Name (Instant update, perfectly synced with photo) */}
-          <div className="mt-6 text-center z-10">
-            <h2 className="text-2xl sm:text-4xl md:text-5xl font-black text-white uppercase tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.25)]">
+          {/* Actor Name */}
+          <div className="shrink-0 mt-2 sm:mt-3 text-center z-10">
+            <h2 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-black text-white uppercase tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.25)] line-clamp-1">
               {currentItem.name}
             </h2>
           </div>
           
-          <div className="mt-4 sm:mt-8 text-[8px] sm:text-[10px] text-fuchsia-500/80 font-mono tracking-[0.2em] sm:tracking-[0.4em] uppercase z-10 flex items-center">
-             ФОТО {itemIndex + 1} ИЗ {round.items.length} <span className="text-white/30 mx-2 sm:mx-3">//</span> BIO_SCAN_ACTIVE
+          <div className="shrink-0 mt-1 sm:mt-2 text-[9px] sm:text-xs text-fuchsia-400/80 font-mono tracking-[0.2em] uppercase z-10 flex items-center">
+             ФОТО {itemIndex + 1} ИЗ {round.items.length} <span className="text-white/30 mx-2">//</span> BIO_SCAN_ACTIVE
           </div>
         </div>
       </div>
 
       {/* Controls info */}
-      <div className="mt-6 sm:mt-12 text-[8px] sm:text-[10px] font-mono opacity-50 uppercase tracking-[0.2em] sm:tracking-[0.3em]">
+      <div className="shrink-0 text-center text-[9px] sm:text-[11px] font-mono opacity-40 uppercase tracking-[0.2em] my-1">
          Управление с пульта ведущего (/host)
       </div>
 
