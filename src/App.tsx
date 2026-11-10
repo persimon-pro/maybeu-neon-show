@@ -10,7 +10,7 @@ import { Round6 } from './components/Round6';
 import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { HostPanel } from './components/HostPanel';
-import { useGameState, getActiveRoomId, getHostKey, getHostUrl, createGame } from './useGameState';
+import { useGameState, getActiveRoomId, getHostKey, getHostUrl, createGame, canResumeGame } from './useGameState';
 import { gameData } from './data';
 
 function SelectScreen() {
@@ -24,9 +24,7 @@ function SelectScreen() {
     const prepare = async () => {
       try {
         let current = getActiveRoomId();
-        const key = getHostKey(current);
-        const access = key ? await fetch('/api/rooms/access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ room: current, hostKey: key }) }) : null;
-        if (!access?.ok) current = await createGame();
+        if (!await canResumeGame(current)) current = await createGame();
         const url = await getHostUrl(current);
         if (active) { setRoom(current); setHostUrl(url); }
       } catch (e) { if (active) setError((e as Error).message); }

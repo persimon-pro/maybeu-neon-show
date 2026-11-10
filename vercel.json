@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "VITE_GAME_TRANSPORT=mqtt npm run build:vercel",
   "outputDirectory": "dist",
   "rewrites": [
     {
