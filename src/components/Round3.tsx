@@ -42,7 +42,7 @@ export function Round3({ gameState }: Round3Props) {
           text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-mono font-black mb-2 sm:mb-4 transition-colors duration-300 leading-none shrink-0
           ${timeLeft <= 5 ? 'text-red-500 drop-shadow-[0_0_20px_rgba(239,68,68,0.8)] status-pulse' : 'text-rose-400 drop-shadow-[0_0_20px_rgba(244,63,94,0.5)]'}
         `}>
-          00:{timeLeft.toString().padStart(2, '0')}
+          {Math.floor(timeLeft / 60).toString().padStart(2, '0')}:{(timeLeft % 60).toString().padStart(2, '0')}
         </div>
 
         {/* Theme Display */}

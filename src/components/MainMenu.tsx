@@ -1,10 +1,11 @@
 import { gameData } from '../data';
 
 interface MainMenuProps {
+  canControl: boolean;
   onSelectRound: (roundNumber: number) => void;
 }
 
-export function MainMenu({ onSelectRound }: MainMenuProps) {
+export function MainMenu({ onSelectRound, canControl }: MainMenuProps) {
   const rounds = [
     { id: 1, data: gameData.round1, color: "from-cyan-500 to-blue-600", shadow: "shadow-cyan-500/50" },
     { id: 2, data: gameData.round2, color: "from-fuchsia-500 to-purple-600", shadow: "shadow-fuchsia-500/50" },
@@ -29,6 +30,7 @@ export function MainMenu({ onSelectRound }: MainMenuProps) {
         {rounds.map((round) => (
           <button
             key={round.id}
+            disabled={!canControl}
             onClick={() => onSelectRound(round.id)}
             className="glass-panel group relative overflow-hidden rounded-xl sm:rounded-2xl p-2 sm:p-4 md:p-6 transition-all duration-300 hover:scale-[1.02] hover:glow-cyan flex flex-col items-center justify-center text-center h-full min-h-0 cursor-pointer"
           >

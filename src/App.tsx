@@ -10,41 +10,35 @@ import { Round6 } from './components/Round6';
 import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { HostPanel } from './components/HostPanel';
-import { useGameState, getActiveRoomId } from './useGameState';
+import { useGameState, getActiveRoomId, getHostKey, getHostUrl, createGame } from './useGameState';
 import { gameData } from './data';
 
 function SelectScreen() {
   const [hostUrl, setHostUrl] = useState('');
   const [copied, setCopied] = useState(false);
 
+  const [room, setRoom] = useState(getActiveRoomId);
+  const [error, setError] = useState('');
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const room = getActiveRoomId();
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      if (isLocal) {
-        fetch('/api/lan-info')
-          .then(res => res.json())
-          .then(data => {
-            if (data && data.ip && data.ip !== 'localhost') {
-              setHostUrl(`http://${data.ip}:${data.port || window.location.port || 3000}/host?room=${room}`);
-            } else {
-              setHostUrl(`${window.location.origin}/host?room=${room}`);
-            }
-          })
-          .catch(() => {
-            setHostUrl(`${window.location.origin}/host?room=${room}`);
-          });
-      } else {
-        setHostUrl(`${window.location.origin}/host?room=${room}`);
-      }
-    }
+    let active = true;
+    const prepare = async () => {
+      try {
+        let current = getActiveRoomId();
+        const key = getHostKey(current);
+        const access = key ? await fetch('/api/rooms/access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ room: current, hostKey: key }) }) : null;
+        if (!access?.ok) current = await createGame();
+        const url = await getHostUrl(current);
+        if (active) { setRoom(current); setHostUrl(url); }
+      } catch (e) { if (active) setError((e as Error).message); }
+    };
+    void prepare();
+    return () => { active = false; };
   }, []);
 
   const handleCopy = () => {
     if (hostUrl) {
-      navigator.clipboard.writeText(hostUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (!navigator.clipboard) { setError('Скопируйте ссылку вручную.'); return; }
+      navigator.clipboard.writeText(hostUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => setError('Скопируйте ссылку вручную.'));
     }
   };
 
@@ -53,6 +47,8 @@ function SelectScreen() {
       <div className="atmosphere" />
       <div className="max-w-4xl w-full flex flex-col gap-6 sm:gap-8 relative z-10 py-6">
         <div className="text-center">
+          {error && <p role="alert">{error}</p>}
+          <button className="text-cyan-300 underline mb-3" onClick={() => { void createGame().then(async current => { setRoom(current); setHostUrl(await getHostUrl(current)); setError(''); }).catch(e => setError(e.message)); }}>Новая игра</button>
           <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-cyan-400 uppercase tracking-[0.1em] sm:tracking-[0.2em] mb-2 glow-cyan drop-shadow-md">
             LOFT SHOW
           </h1>
@@ -62,13 +58,13 @@ function SelectScreen() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          <Link to="/display" className="glass-panel p-6 sm:p-10 rounded-2xl sm:rounded-3xl flex flex-col items-center justify-center hover:scale-[1.02] transition-all duration-300 group hover:glow-cyan">
+          <Link aria-disabled={!hostUrl} onClick={e => { if (!hostUrl) e.preventDefault(); }} to={`/display?room=${encodeURIComponent(room)}`} className="glass-panel p-6 sm:p-10 rounded-2xl sm:rounded-3xl flex flex-col items-center justify-center hover:scale-[1.02] transition-all duration-300 group hover:glow-cyan">
              <div className="text-5xl sm:text-7xl mb-4 opacity-70 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0">📺</div>
              <h2 className="text-xl sm:text-3xl font-bold text-white uppercase tracking-widest mb-1 sm:mb-2">Главный Экран</h2>
              <p className="text-cyan-400/80 font-mono text-xs sm:text-sm text-center uppercase tracking-widest">Проектор / ТВ</p>
           </Link>
           
-          <Link to="/host" className="glass-panel p-6 sm:p-10 rounded-2xl sm:rounded-3xl flex flex-col items-center justify-center hover:scale-[1.02] transition-all duration-300 group hover:shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+          <Link aria-disabled={!hostUrl} onClick={e => { if (!hostUrl) e.preventDefault(); }} to={`/host?room=${encodeURIComponent(room)}`} className="glass-panel p-6 sm:p-10 rounded-2xl sm:rounded-3xl flex flex-col items-center justify-center hover:scale-[1.02] transition-all duration-300 group hover:shadow-[0_0_20px_rgba(16,185,129,0.3)]">
              <div className="text-5xl sm:text-7xl mb-4 opacity-70 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0">📱</div>
              <h2 className="text-xl sm:text-3xl font-bold text-white uppercase tracking-widest mb-1 sm:mb-2">Пульт Ведущего</h2>
              <p className="text-emerald-400/80 font-mono text-xs sm:text-sm text-center uppercase tracking-widest">Открыть в этом браузере</p>
@@ -154,7 +150,7 @@ const renderSidebarName = (name: string, type: 'teams' | 'players', isOdd: boole
 };
 
 function Display() {
-  const { gameState, dispatch, isConnected } = useGameState('display');
+  const { gameState, dispatch, isConnected, error, canControl } = useGameState('display');
 
   // Preload all game images immediately so round transitions have zero delay
   useEffect(() => {
@@ -192,7 +188,7 @@ function Display() {
       case 6:
         return <Round6 gameState={gameState} dispatch={dispatch} />;
       default:
-        return <MainMenu onSelectRound={(r) => dispatch({ type: 'SET_ROUND', round: r })} />;
+        return <MainMenu canControl={canControl} onSelectRound={(r) => dispatch({ type: 'SET_ROUND', round: r })} />;
     }
   };
 
@@ -200,6 +196,7 @@ function Display() {
 
   return (
     <div className="h-screen h-[100dvh] w-screen overflow-hidden flex flex-col font-sans selection:bg-cyan-500/30 relative">
+      {(error || !isConnected) && <div role="status" className="bg-amber-950 text-amber-200 p-2 text-center">{error || 'Подключение к серверу…'}</div>}
       <ScoreBoard 
         gameSettings={gameState.gameSettings} 
         onGoHome={() => dispatch({ type: 'SET_ROUND', round: null })}

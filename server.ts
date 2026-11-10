@@ -1,330 +1,104 @@
-import express from "express";
-import path from "path";
-import { createServer as createViteServer } from "vite";
-import { Server } from "socket.io";
-import { createServer } from "http";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
-import { gameData } from "./src/data";
+import express from 'express';
+import path from 'node:path';
+import os from 'node:os';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createServer } from 'node:http';
+import { Server } from 'socket.io';
+import { gameReducer, initialGameState, isValidAction } from './src/game';
+import type { ServerGameState } from './src/types';
 
-import os from "os";
-
-function getLocalIp() {
-  const interfaces = os.networkInterfaces();
-  for (const name of Object.keys(interfaces)) {
-    for (const iface of interfaces[name] || []) {
-      if (iface.family === 'IPv4' && !iface.internal) {
-        return iface.address;
-      }
-    }
-  }
-  return 'localhost';
-}
-
-async function startServer() {
+const ROOM_PATTERN = /^[a-z0-9_-]{1,64}$/;
+type Room = { state: ServerGameState; hostKey: string; touched: number };
+export async function startServer(port = Number(process.env.PORT || 3000)) {
   const app = express();
   const httpServer = createServer(app);
-  const io = new Server(httpServer, {
-    cors: { origin: "*" }
+  const io = new Server(httpServer, { maxHttpBufferSize: 8192 });
+  const rooms = new Map<string, Room>();
+  const creationLimits = new Map<string, { count: number; until: number }>();
+  const authorized = (room: Room, key: unknown) => typeof key === 'string' && /^[a-f0-9]{64}$/.test(key) && timingSafeEqual(Buffer.from(key), Buffer.from(room.hostKey));
+  app.use(express.json({ limit: '8kb' }));
+  app.use((_req, res, next) => { res.setHeader('Referrer-Policy', 'no-referrer'); next(); });
+  app.post('/api/rooms', (req, res) => {
+    const ip = req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    let limit = creationLimits.get(ip);
+    if (!limit || limit.until < now) { limit = { count: 0, until: now + 60000 }; creationLimits.set(ip, limit); }
+    if (++limit.count > 30 || rooms.size >= 1000) { res.status(429).json({ error: 'Слишком много комнат. Повторите позже.' }); return; }
+    const id = `loft_${randomBytes(8).toString('hex')}`;
+    const room = { state: structuredClone(initialGameState), hostKey: randomBytes(32).toString('hex'), touched: now };
+    rooms.set(id, room);
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(201).json({ room: id, hostKey: room.hostKey });
   });
-
-  app.get('/api/lan-info', (req, res) => {
-    res.json({ ip: getLocalIp(), port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000 });
+  app.post('/api/rooms/access', (req, res) => {
+    const room = rooms.get(req.body?.room);
+    res.sendStatus(room && authorized(room, req.body?.hostKey) ? 204 : 403);
   });
-
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-
-  // Global Game State
-  const gameState = {
-    team1Score: 0,
-    team2Score: 0,
-    currentRound: null as number | null,
-    round1: {
-      wordIndex: 0,
-      timeLeft: 20,
-      isActive: false,
-      roundEnd: false
-    },
-    round2: {
-      itemIndex: 0,
-      isAnswerRevealed: false,
-      roundEnd: false
-    },
-    round3: {
-      themeIndex: 0,
-      timeLeft: 60,
-      isActive: false,
-      roundEnd: false
-    },
-    round4: {
-      itemIndex: 0,
-      isAnswerRevealed: false,
-      roundEnd: false
-    },
-    round5: {
-      itemIndex: 0,
-      isAnswerRevealed: false,
-      roundEnd: false
-    },
-    round6: {
-      currentThemeIndex: null,
-      currentWordIndex: null,
-      isAnswerRevealed: false
-    },
-    gameSettings: {
-      isConfigured: false,
-      type: "teams" as "teams" | "players",
-      count: 2,
-      participants: [] as { id: number; name: string; score: number }[]
-    }
-  };
-
-  io.on("connection", (socket) => {
-    // Send initial state to new clients
-    socket.emit("state_update", gameState);
-
-    // Act as a simple event broker
-    socket.on("action", (action) => {
-      switch (action.type) {
-        case "UPDATE_SCORE": {
-          const participant = gameState.gameSettings.participants.find(p => p.id === action.team);
-          if (participant) {
-            participant.score = Math.max(0, participant.score + action.delta);
-            // Sync legacy fields for backward compatibility
-            if (action.team === 1) gameState.team1Score = participant.score;
-            if (action.team === 2) gameState.team2Score = participant.score;
-          }
-          break;
-        }
-        case "CONFIGURE_GAME": {
-          const { mode, count, names } = action;
-          const participants = [];
-          for (let i = 1; i <= count; i++) {
-            const defaultName = mode === "teams" ? `Команда ${i}` : `Участник ${i}`;
-            const customName = names && names[i - 1] ? names[i - 1].trim() : "";
-            participants.push({
-              id: i,
-              name: customName || defaultName,
-              score: 0
-            });
-          }
-          gameState.gameSettings = {
-            isConfigured: true,
-            type: mode,
-            count,
-            participants
-          };
-          // Reset legacy scores
-          gameState.team1Score = 0;
-          gameState.team2Score = 0;
-          break;
-        }
-        case "RESET_GAME_SETTINGS": {
-          gameState.gameSettings.isConfigured = false;
-          break;
-        }
-        case "RESET_SCORES": {
-          gameState.gameSettings.participants.forEach(p => {
-            p.score = 0;
-          });
-          gameState.team1Score = 0;
-          gameState.team2Score = 0;
-          break;
-        }
-        case "SET_ROUND":
-          gameState.currentRound = action.round;
-          break;
-        case "R1_START":
-          gameState.round1.isActive = true;
-          break;
-        case "R1_PAUSE":
-          gameState.round1.isActive = false;
-          break;
-        case "R1_NEXT_WORD":
-          gameState.round1.wordIndex += 1;
-          gameState.round1.timeLeft = 20;
-          if (gameState.round1.wordIndex >= gameData.round1.words.length) { // Should match max words
-            gameState.round1.roundEnd = true;
-            gameState.round1.isActive = false;
-          }
-          break;
-        case "R1_RESET":
-          gameState.round1 = {
-            wordIndex: 0,
-            timeLeft: 20,
-            isActive: false,
-            roundEnd: false
-          };
-          break;
-        case "R2_REVEAL_ANSWER":
-          gameState.round2.isAnswerRevealed = true;
-          break;
-        case "R2_NEXT_ITEM":
-          gameState.round2.itemIndex += 1;
-          gameState.round2.isAnswerRevealed = false;
-          if (gameState.round2.itemIndex >= gameData.round2.items.length) { // Should match max items
-            gameState.round2.roundEnd = true;
-          }
-          break;
-        case "R2_RESET":
-          gameState.round2 = {
-            itemIndex: 0,
-            isAnswerRevealed: false,
-            roundEnd: false
-          };
-          break;
-        case "R3_START":
-          gameState.round3.isActive = true;
-          break;
-        case "R3_PAUSE":
-          gameState.round3.isActive = false;
-          break;
-        case "R3_NEXT_THEME":
-          if (gameState.round3.themeIndex < gameData.round3.themes.length - 1) {
-            gameState.round3.themeIndex += 1;
-            gameState.round3.timeLeft = 60;
-            gameState.round3.isActive = false;
-          } else {
-            gameState.round3.roundEnd = true;
-            gameState.round3.isActive = false;
-          }
-          break;
-        case "R3_RESET_TIME":
-          gameState.round3.timeLeft = 60;
-          gameState.round3.isActive = false;
-          break;
-        case "R3_RESET":
-          gameState.round3 = {
-            themeIndex: 0,
-            timeLeft: 60,
-            isActive: false,
-            roundEnd: false
-          };
-          break;
-        case "R4_REVEAL_ANSWER":
-          gameState.round4.isAnswerRevealed = true;
-          break;
-        case "R4_NEXT_ITEM":
-          gameState.round4.itemIndex += 1;
-          gameState.round4.isAnswerRevealed = false;
-          if (gameState.round4.itemIndex >= gameData.round4.items.length) { // Should match max items
-            gameState.round4.roundEnd = true;
-          }
-          break;
-        case "R4_RESET":
-          gameState.round4 = {
-            itemIndex: 0,
-            isAnswerRevealed: false,
-            roundEnd: false
-          };
-          break;
-        case "R5_REVEAL_ANSWER":
-          gameState.round5.isAnswerRevealed = true;
-          break;
-        case "R5_NEXT_ITEM":
-          gameState.round5.itemIndex += 1;
-          gameState.round5.isAnswerRevealed = false;
-          if (gameState.round5.itemIndex >= gameData.round5.items.length) { // Should match max items
-            gameState.round5.roundEnd = true;
-          }
-          break;
-        case "R5_RESET":
-          gameState.round5 = {
-            itemIndex: 0,
-            isAnswerRevealed: false,
-            roundEnd: false
-          };
-          break;
-        case "R6_SET_THEME":
-          gameState.round6.currentThemeIndex = action.index;
-          gameState.round6.currentWordIndex = null;
-          gameState.round6.isAnswerRevealed = false;
-          break;
-        case "R6_SET_WORD":
-          gameState.round6.currentWordIndex = action.index;
-          gameState.round6.isAnswerRevealed = false;
-          break;
-        case "R6_REVEAL_ANSWER":
-          gameState.round6.isAnswerRevealed = true;
-          break;
-        case "R6_RESET":
-          gameState.round6 = {
-            currentThemeIndex: null,
-            currentWordIndex: null,
-            isAnswerRevealed: false
-          };
-          break;
-      }
-      io.emit("state_update", gameState);
+  app.get('/api/lan-info', (_req, res) => {
+    const ip = Object.values(os.networkInterfaces()).flat().find(i => i?.family === 'IPv4' && !i.internal)?.address || 'localhost';
+    res.json({ ip, port: (httpServer.address() as { port?: number } | null)?.port || port });
+  });
+  io.use((socket, next) => {
+    const { room, hostKey } = socket.handshake.auth || {};
+    if (typeof room !== 'string' || !ROOM_PATTERN.test(room)) return next(new Error('Некорректная комната'));
+    const session = rooms.get(room);
+    if (!session) return next(new Error('Комната не найдена. Создайте игру на главной странице.'));
+    if (hostKey && !authorized(session, hostKey)) return next(new Error('Ключ ведущего недействителен.'));
+    socket.data.room = room;
+    socket.data.canControl = authorized(session, hostKey);
+    next();
+  });
+  io.on('connection', socket => {
+    const id: string = socket.data.room;
+    const room = rooms.get(id)!;
+    room.touched = Date.now();
+    socket.join(id);
+    socket.emit('state_update', room.state);
+    let count = 0, windowStart = Date.now();
+    socket.on('action', (action: unknown, ack?: (result: { ok: boolean; error?: string }) => void) => {
+      const reply = (ok: boolean, error?: string) => { if (typeof ack === 'function') ack({ ok, error }); };
+      if (Date.now() - windowStart > 1000) { count = 0; windowStart = Date.now(); }
+      if (++count > 60) { reply(false, 'Слишком много команд'); return; }
+      if (!socket.data.canControl) { reply(false, 'Нужна ссылка ведущего с ключом'); return; }
+      if (!isValidAction(action, room.state) || action.type === 'TICK') { reply(false, 'Некорректная команда'); return; }
+      room.state = gameReducer(room.state, action);
+      room.touched = Date.now();
+      io.to(id).emit('state_update', room.state);
+      reply(true);
     });
   });
-
-  // Server-side ticker for time-based events
-  setInterval(() => {
-    let statChanged = false;
-    if (gameState.round1.isActive && !gameState.round1.roundEnd) {
-      if (gameState.round1.timeLeft > 0) {
-        gameState.round1.timeLeft -= 1;
-        statChanged = true;
+  const ticker = setInterval(() => {
+    const now = Date.now();
+    for (const [id, room] of rooms) {
+      const connected = io.sockets.adapter.rooms.get(id)?.size;
+      if (!connected) {
+        room.state.round1.isActive = false;
+        room.state.round3.isActive = false;
+        if (now - room.touched > 86400000) rooms.delete(id);
+        continue;
       }
-      if (gameState.round1.timeLeft === 0) {
-        // Auto skip
-        gameState.round1.wordIndex += 1;
-        gameState.round1.timeLeft = 20;
-        statChanged = true;
-        if (gameState.round1.wordIndex >= gameData.round1.words.length) {
-          gameState.round1.roundEnd = true;
-          gameState.round1.isActive = false;
-        }
+      room.touched = now;
+      if (room.state.round1.isActive || room.state.round3.isActive) {
+        room.state = gameReducer(room.state, { type: 'TICK' });
+        io.to(id).emit('state_update', room.state);
       }
     }
-    
-    if (gameState.round3.isActive && !gameState.round3.roundEnd) {
-      if (gameState.round3.timeLeft > 0) {
-        gameState.round3.timeLeft -= 1;
-        statChanged = true;
-      }
-      if (gameState.round3.timeLeft === 0) {
-        gameState.round3.isActive = false;
-        statChanged = true;
-      }
-    }
-    
-    // No timer for round 5 now
-
-    if (statChanged) {
-      io.emit("state_update", gameState);
-    }
+    for (const [ip, limit] of creationLimits) if (limit.until < now) creationLimits.delete(ip);
   }, 1000);
-
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      configFile: false,
-      plugins: [react(), tailwindcss()],
-      resolve: {
-        alias: {
-          '@': path.resolve(process.cwd(), '.'),
-        },
-      },
-      server: {
-        middlewareMode: true,
-        hmr: process.env.DISABLE_HMR !== 'true',
-      },
-      appType: "spa",
-    });
+  httpServer.on('close', () => clearInterval(ticker));
+  if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({ server: { middlewareMode: true, hmr: process.env.DISABLE_HMR !== 'true' }, appType: 'spa' });
     app.use(vite.middlewares);
+    httpServer.on('close', () => { void vite.close(); });
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    app.use(express.static(path.resolve('dist')));
+    app.get('*', (_req, res) => res.sendFile(path.resolve('dist/index.html')));
   }
-
-  httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  await new Promise<void>((resolve, reject) => { httpServer.once('error', reject); httpServer.listen(port, '0.0.0.0', resolve); });
+  return { httpServer, io };
 }
 
-startServer();
+if (process.env.NODE_ENV !== 'test') {
+  startServer().then(({ httpServer }) => console.log(`Server running on port ${(httpServer.address() as { port: number }).port}`)).catch(error => { console.error(error); process.exitCode = 1; });
+}

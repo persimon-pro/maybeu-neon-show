@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useGameState } from '../useGameState';
 import { gameData } from '../data';
 
@@ -15,7 +15,7 @@ const getRoundName = (roundNum: number): string => {
 };
 
 export function HostPanel() {
-  const { gameState, dispatch, isConnected, roomId, changeRoom } = useGameState('host');
+  const { gameState, dispatch, isConnected, roomId, changeRoom, canControl, error } = useGameState('host');
   const [isMenuExpanded, setIsMenuExpanded] = useState(false);
   const [configType, setConfigType] = useState<'teams' | 'players'>('teams');
   const [configCount, setConfigCount] = useState<number>(2);
@@ -62,7 +62,7 @@ export function HostPanel() {
     setIsMenuExpanded(false);
   };
 
-  const handleSaveRoom = (e: React.FormEvent) => {
+  const handleSaveRoom = (e: FormEvent) => {
     e.preventDefault();
     if (roomInput.trim()) {
       changeRoom(roomInput.trim());
@@ -85,7 +85,7 @@ export function HostPanel() {
             Комната подключения
           </h3>
           <p className="text-xs text-slate-300">
-            Для управления главный экран и пульт должны находиться в одной комнате.
+            Для другой комнаты откройте её QR-код или ссылку ведущего. В этом браузере можно переключиться на комнату, ключ которой уже сохранён.
           </p>
           <form onSubmit={handleSaveRoom} className="flex flex-col gap-3">
             <input 
@@ -99,13 +99,11 @@ export function HostPanel() {
               <button
                 type="button"
                 onClick={() => {
-                  changeRoom('loft_main');
-                  setRoomInput('loft_main');
                   setShowRoomModal(false);
                 }}
                 className="flex-1 py-2 text-xs font-mono rounded-lg bg-white/10 text-slate-300 hover:bg-white/15"
               >
-                Сброс (loft_main)
+                Отмена
               </button>
               <button
                 type="submit"
@@ -120,10 +118,19 @@ export function HostPanel() {
     );
   };
 
+  if (!canControl || !isConnected) {
+    return <div className="min-h-screen bg-black text-white p-8 flex flex-col gap-4">
+      <h1 className="text-2xl">Пульт ведущего</h1>
+      <p role="status">{error || (canControl ? 'Подключение к серверу…' : 'Откройте ссылку ведущего или QR-код создателя игры.')}</p>
+      <a href="/" className="text-cyan-400 underline">Создать новую игру</a>
+    </div>;
+  }
+
   if (!gameState.gameSettings || !gameState.gameSettings.isConfigured) {
     return (
       <div className="min-h-screen bg-black text-white p-6 font-sans max-w-md mx-auto flex flex-col justify-center gap-6">
         {renderRoomModal()}
+        {error && <p role="alert" className="text-amber-300">{error}</p>}
         <div className="text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider mb-3 border border-white/10 bg-white/5">
             <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
@@ -269,6 +276,7 @@ export function HostPanel() {
         </div>
       </div>
       {renderRoomModal()}
+        {error && <p role="alert" className="text-amber-300">{error}</p>}
 
       {/* Score Controls */}
       <div className="grid grid-cols-2 gap-3 mb-8">
@@ -475,6 +483,7 @@ export function HostPanel() {
                   {!gameState.round3.isActive ? (
                     <button 
                       onClick={() => dispatch({ type: 'R3_START' })}
+                      disabled={gameState.round3.timeLeft === 0}
                       className="bg-emerald-500 text-black font-bold py-4 rounded-lg uppercase"
                     >
                       Продолжить

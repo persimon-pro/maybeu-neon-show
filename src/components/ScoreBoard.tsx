@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { GameSettings } from '../types';
-import { getActiveRoomId } from '../useGameState';
+import { getActiveRoomId, getHostUrl, getHostKey } from '../useGameState';
 
 interface ScoreBoardProps {
   gameSettings: GameSettings;
@@ -29,28 +29,7 @@ export function ScoreBoard({ onGoHome }: ScoreBoardProps) {
     }
   };
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const room = getActiveRoomId();
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      if (isLocal) {
-        fetch('/api/lan-info')
-          .then(res => res.json())
-          .then(data => {
-            if (data && data.ip && data.ip !== 'localhost') {
-              setHostUrl(`http://${data.ip}:${data.port || window.location.port || 3000}/host?room=${room}`);
-            } else {
-              setHostUrl(`${window.location.origin}/host?room=${room}`);
-            }
-          })
-          .catch(() => {
-            setHostUrl(`${window.location.origin}/host?room=${room}`);
-          });
-      } else {
-        setHostUrl(`${window.location.origin}/host?room=${room}`);
-      }
-    }
-  }, []);
+  useEffect(() => { void getHostUrl().then(setHostUrl); }, []);
 
   return (
     <>
@@ -92,7 +71,8 @@ export function ScoreBoard({ onGoHome }: ScoreBoardProps) {
           <button
             onClick={() => setShowQrModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-mono text-xs uppercase tracking-wider active:scale-95 transition-all cursor-pointer shadow-[0_0_10px_rgba(16,185,129,0.2)]"
-            title="Открыть QR-код для телефона ведущего"
+            disabled={!getHostKey()}
+            title={getHostKey() ? "Открыть QR-код для телефона ведущего" : "Ссылка ведущего доступна создателю игры"}
           >
             <span>📱</span>
             <span>Пульт</span>
@@ -143,7 +123,7 @@ export function ScoreBoard({ onGoHome }: ScoreBoardProps) {
                 Наведите камеру смартфона на QR-код
               </p>
               <p className="text-slate-400 text-[11px] leading-relaxed">
-                Или введите на телефоне: <span className="text-cyan-400 font-mono">.../host</span>
+                Используйте QR-код или ссылку создателя игры.
               </p>
               <div className="mt-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/60 border border-emerald-500/30 text-[11px] font-mono text-emerald-300">
                 <span>Комната:</span>
